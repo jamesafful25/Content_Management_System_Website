@@ -1,3 +1,15 @@
+
+# --------------------------------------------------
+# AWS Account, Region and Partition Data Sources
+# --------------------------------------------------
+
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
+data "aws_partition" "current" {}
+
+
 # --------------------------------------------------
 # GitHub Actions OIDC Trust Policy
 # --------------------------------------------------
@@ -11,7 +23,7 @@ data "aws_iam_policy_document" "github_actions_trust" {
       type = "Federated"
 
       identifiers = [
-        "arn:aws:iam::448161422880:oidc-provider/token.actions.githubusercontent.com"
+        "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/token.actions.githubusercontent.com"
       ]
     }
 
@@ -55,7 +67,6 @@ resource "aws_iam_role" "github_actions" {
 # --------------------------------------------------
 
 data "aws_iam_policy_document" "ecr_push" {
-
   statement {
     sid    = "ECRAuthentication"
     effect = "Allow"
@@ -153,6 +164,7 @@ resource "aws_iam_role_policy_attachment" "eks_describe" {
   policy_arn = aws_iam_policy.eks_describe.arn
 }
 
+
 # --------------------------------------------------
 # CodeBuild Service Role Trust Policy
 # --------------------------------------------------
@@ -170,7 +182,7 @@ data "aws_iam_policy_document" "codebuild_trust" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
-      values   = ["448161422880"]
+      values   = [data.aws_caller_identity.current.account_id]
     }
   }
 }
@@ -192,8 +204,9 @@ resource "aws_iam_role" "codebuild" {
   }
 }
 
+
 # --------------------------------------------------
-# CodeBuild Deployment Artifacts S3 Policy
+# CodeBuild Deployment Artifacts S3 and CloudWatch Logs Policy
 # --------------------------------------------------
 
 data "aws_iam_policy_document" "codebuild_s3" {
@@ -225,6 +238,22 @@ data "aws_iam_policy_document" "codebuild_s3" {
       "${var.deployment_artifacts_bucket_arn}/*"
     ]
   }
+
+  statement {
+    sid    = "AllowCodeBuildCloudWatchLogs"
+    effect = "Allow"
+
+    actions = [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ]
+
+    resources = [
+      "arn:${data.aws_partition.current.partition}:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_name}-${var.environment}-eks-deployment",
+      "arn:${data.aws_partition.current.partition}:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/codebuild/${var.project_name}-${var.environment}-eks-deployment:*"
+    ]
+  }
 }
 
 
@@ -240,10 +269,12 @@ resource "aws_iam_policy" "codebuild_s3" {
   }
 }
 
+
 resource "aws_iam_role_policy_attachment" "codebuild_s3" {
   role       = aws_iam_role.codebuild.name
   policy_arn = aws_iam_policy.codebuild_s3.arn
 }
+
 
 # --------------------------------------------------
 # CodeBuild EKS Describe Policy
@@ -287,12 +318,6 @@ resource "aws_iam_role_policy_attachment" "codebuild_eks_describe" {
 # --------------------------------------------------
 # GitHub Actions CodeBuild Deployment Permissions
 # --------------------------------------------------
-
-data "aws_caller_identity" "current" {}
-
-data "aws_region" "current" {}
-
-data "aws_partition" "current" {}
 
 data "aws_iam_policy_document" "github_deployment" {
   statement {
@@ -344,6 +369,7 @@ data "aws_iam_policy_document" "github_deployment" {
   }
 }
 
+
 resource "aws_iam_policy" "github_deployment" {
   name        = "${var.project_name}-${var.environment}-github-deployment"
   description = "Allow GitHub Actions to upload CMS deployment packages and start CodeBuild"
@@ -355,6 +381,7 @@ resource "aws_iam_policy" "github_deployment" {
     ManagedBy   = "Terraform"
   }
 }
+
 
 resource "aws_iam_role_policy_attachment" "github_deployment" {
   role       = aws_iam_role.github_actions.name
@@ -383,19 +410,29 @@ data "aws_iam_policy_document" "codebuild_vpc" {
   }
 
   statement {
-    sid    = "CreateAndDeleteNetworkInterfaces"
+    sid    = "CreateNetworkInterfaces"
     effect = "Allow"
 
     actions = [
-      "ec2:CreateNetworkInterface",
-      "ec2:DeleteNetworkInterface"
+      "ec2:CreateNetworkInterface"
     ]
 
     resources = [
-      "arn:aws:ec2:us-east-1:448161422880:network-interface/*",
-      "arn:aws:ec2:us-east-1:448161422880:subnet/*",
-      "arn:aws:ec2:us-east-1:448161422880:security-group/*"
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:network-interface/*",
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:subnet/*",
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:security-group/*"
     ]
+  }
+
+  statement {
+    sid    = "DeleteNetworkInterfaces"
+    effect = "Allow"
+
+    actions = [
+      "ec2:DeleteNetworkInterface"
+    ]
+
+    resources = ["*"]
   }
 
   statement {
@@ -407,7 +444,7 @@ data "aws_iam_policy_document" "codebuild_vpc" {
     ]
 
     resources = [
-      "arn:aws:ec2:us-east-1:448161422880:network-interface/*"
+      "arn:${data.aws_partition.current.partition}:ec2:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:network-interface/*"
     ]
 
     condition {
@@ -417,6 +454,7 @@ data "aws_iam_policy_document" "codebuild_vpc" {
     }
   }
 }
+
 
 resource "aws_iam_policy" "codebuild_vpc" {
   name        = "${var.project_name}-${var.environment}-codebuild-vpc"
@@ -429,6 +467,7 @@ resource "aws_iam_policy" "codebuild_vpc" {
     ManagedBy   = "Terraform"
   }
 }
+
 
 resource "aws_iam_role_policy_attachment" "codebuild_vpc" {
   role       = aws_iam_role.codebuild.name

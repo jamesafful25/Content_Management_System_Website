@@ -3,34 +3,49 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-// 1. Get the directory containing this migration runner
+// --------------------------------------------------
+// 1. Identify the migration file
+// --------------------------------------------------
+
 const __filename = fileURLToPath(
     import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// 2. Define the migration file
-const migrationFile = path.join(__dirname, '001-create-initial-schema.sql')
+const migrationFile = path.join(
+    __dirname,
+    '001-create-initial-schema.sql'
+)
 
-// 3. Define the migration name
 const migrationName = '001-create-initial-schema'
 
-// 4. Create the database connection
-const connection = await mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    ssl: {
-        ca: fs.readFileSync(new URL('../certs/global-bundle.pem',
-            import.meta.url)),
-        rejectUnauthorized: true
-    },
-    multipleStatements: true
-})
+// --------------------------------------------------
+// 2. Run the database migration
+// --------------------------------------------------
 
 const runMigration = async() => {
+    let connection
+
     try {
-        // 5. Create a table to track completed migrations
+        // 3. Establish the database connection
+        console.log('Connecting to the RDS database...')
+
+        connection = await mysql.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
+            ssl: {
+                ca: fs.readFileSync(
+                    new URL('../certs/global-bundle.pem',
+                        import.meta.url)
+                ),
+                rejectUnauthorized: true
+            },
+            multipleStatements: true,
+            connectTimeout: 15000
+        })
+
+        // 4. Create the migration tracking table
         await connection.execute(`
             CREATE TABLE IF NOT EXISTS schema_migrations (
                 id INT NOT NULL AUTO_INCREMENT,
@@ -41,7 +56,7 @@ const runMigration = async() => {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         `)
 
-        // 6. Check whether this migration has already run
+        // 5. Check whether this migration has already run
         const [existingMigrations] = await connection.execute(
             'SELECT migration_name FROM schema_migrations WHERE migration_name = ?', [migrationName]
         )
@@ -51,13 +66,13 @@ const runMigration = async() => {
             return
         }
 
-        // 7. Read the SQL migration file
+        // 6. Read the SQL migration file
         const migrationSQL = fs.readFileSync(migrationFile, 'utf8')
 
-        // 8. Execute the SQL statements
+        // 7. Execute the SQL statements
         await connection.query(migrationSQL)
 
-        // 9. Record the successful migration
+        // 8. Record the successful migration
         await connection.execute(
             'INSERT INTO schema_migrations (migration_name) VALUES (?)', [migrationName]
         )
@@ -69,10 +84,16 @@ const runMigration = async() => {
         throw error
 
     } finally {
-        // 10. Close the database connection
-        await connection.end()
+        // 9. Close the connection if it was established
+        if (connection) {
+            await connection.end()
+        }
     }
 }
+
+// --------------------------------------------------
+// 10. Execute the migration
+// --------------------------------------------------
 
 runMigration().catch(() => {
     process.exitCode = 1

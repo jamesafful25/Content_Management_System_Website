@@ -9,6 +9,7 @@ env:
     RUNTIME_DB_SECRET_ARN: "arn:aws:secretsmanager:us-east-1:448161422880:secret:cms/dev/database/runtime-HZGIu2"
     MIGRATION_DB_SECRET_ARN: "arn:aws:secretsmanager:us-east-1:448161422880:secret:cms/dev/database/migration-hITBTV"
     DB_NAME: "cms_db"
+    DB_HOST: "cms-dev-mysql.csreme2g296t.us-east-1.rds.amazonaws.com"
 
 phases:
   pre_build:
@@ -63,7 +64,7 @@ phases:
         export KUBECONFIG="$HOME/.kube/config"
 
         echo "Testing connection to EKS..."
-        kubectl get nodes
+        kubectl get pods --namespace "${DEPLOYMENT_NAMESPACE}"
 
   build:
     commands:
@@ -120,6 +121,8 @@ phases:
                       value: "${MIGRATION_DB_SECRET_ARN}"
                     - name: DB_NAME
                       value: "${DB_NAME}"
+                    - name: DB_HOST
+                      value: "${DB_HOST}"
         JOB
 
         kubectl apply -f /tmp/db-user-setup-job.yaml
