@@ -49,7 +49,6 @@ jobs:
           push: true
           tags: |
             448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend:${{ github.sha }}
-            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend:latest
 
       # ------------------------------------------
       # STEP 2: Build and push frontend image
@@ -63,7 +62,6 @@ jobs:
           push: true
           tags: |
             448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend:${{ github.sha }}
-            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend:latest
 
       # ------------------------------------------
       # STEP 3: Package Kubernetes deployment files
