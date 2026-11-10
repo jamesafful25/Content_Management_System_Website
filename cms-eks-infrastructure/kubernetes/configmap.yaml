@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cms-config
+  namespace: cms
+data:
+  NODE_ENV: "production"
+  PORT: "5000"
+  AWS_REGION: "us-east-1"
+  S3_BUCKET: "cms-dev-uploads-448161422880"
+  UPLOAD_PATH: "uploads"
+  MAX_FILE_SIZE: "5242880"
+  DB_HOST: "cms-dev-mysql.csreme2g296t.us-east-1.rds.amazonaws.com"
+  DB_NAME: "cms_db"

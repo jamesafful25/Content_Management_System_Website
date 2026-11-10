@@ -1,0 +1,28 @@
+
+# Dependencies
+node_modules/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Local uploaded images
+uploads/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Git
+.git/
+.gitignore
+
+# Tests and coverage
+coverage/
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

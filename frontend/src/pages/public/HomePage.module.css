@@ -1,0 +1,104 @@
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.sectionSub {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin-top: 6px;
+}
+
+.searchBox {
+  position: relative;
+  width: 280px;
+}
+.searchIcon {
+  position: absolute;
+  left: 14px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.9rem;
+}
+.searchInput {
+  width: 100%;
+  padding: 11px 16px 11px 38px;
+  border: 2px solid var(--border);
+  border-radius: 100px;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color var(--transition);
+  font-family: var(--font-body);
+}
+.searchInput:focus { border-color: var(--accent); }
+
+.filterTabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 36px;
+}
+
+.tab {
+  padding: 8px 20px;
+  border-radius: 100px;
+  border: 2px solid var(--border);
+  background: white;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.tab:hover { border-color: var(--accent); color: var(--accent); }
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.cardSkeleton {
+  aspect-ratio: 3/4;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.errorState, .emptyState {
+  text-align: center;
+  padding: 80px 20px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+  .sectionHeader { flex-direction: column; }
+  .searchBox { width: 100%; }
+}

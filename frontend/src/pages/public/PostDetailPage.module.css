@@ -1,0 +1,168 @@
+.loadingWrap { padding-top: var(--nav-height); }
+.skeletonHero {
+  height: 480px;
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.skeletonContent { max-width: 720px; margin: 48px auto; display: flex; flex-direction: column; gap: 14px; }
+.skeletonLine { height: 16px; border-radius: 8px; background: #e2e8f0; }
+.skeletonLine:nth-child(even) { width: 80%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.errorWrap {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  text-align: center;
+  padding: 40px;
+  color: var(--text-muted);
+}
+
+.article { padding-bottom: 80px; }
+
+.hero {
+  position: relative;
+  height: 520px;
+  overflow: hidden;
+}
+.heroImage {
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+.heroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(5,10,25,0.9) 0%, rgba(5,10,25,0.4) 60%, transparent 100%);
+}
+.heroContent {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding-bottom: 48px;
+}
+
+.categoryBadge {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 100px;
+  margin-bottom: 16px;
+  transition: background var(--transition);
+}
+.categoryBadge:hover { background: var(--accent-light); }
+
+.title {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.6rem);
+  font-weight: 900;
+  color: white;
+  line-height: 1.2;
+  margin-bottom: 20px;
+  max-width: 820px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.author {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 1rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255,255,255,0.3);
+}
+.authorName {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: white;
+}
+.date {
+  display: block;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.65);
+  margin-top: 2px;
+}
+
+.views {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.65);
+}
+
+/* Article Content */
+.contentWrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 0;
+}
+
+.summary {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+  border-left: 4px solid var(--accent);
+  padding-left: 20px;
+  margin-bottom: 36px;
+  font-style: italic;
+}
+
+/* Quill content rendering */
+.content { font-size: 1.05rem; line-height: 1.85; color: var(--text); }
+.content :global(h1),
+.content :global(h2),
+.content :global(h3) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  margin: 32px 0 16px;
+  color: var(--primary);
+  line-height: 1.3;
+}
+.content :global(h1) { font-size: 1.8rem; }
+.content :global(h2) { font-size: 1.4rem; }
+.content :global(h3) { font-size: 1.15rem; }
+.content :global(p) { margin-bottom: 20px; }
+.content :global(img) { border-radius: var(--radius-md); margin: 24px 0; max-width: 100%; }
+.content :global(blockquote) {
+  border-left: 4px solid var(--accent);
+  margin: 28px 0;
+  padding: 12px 24px;
+  background: rgba(232,93,38,0.05);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.content :global(ul), .content :global(ol) { padding-left: 24px; margin-bottom: 20px; }
+.content :global(li) { margin-bottom: 8px; }
+.content :global(a) { color: var(--accent); text-decoration: underline; }
+.content :global(strong) { font-weight: 700; color: var(--primary); }
+
+.backWrap { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--border); }
+
+@media (max-width: 768px) {
+  .hero { height: 380px; }
+  .contentWrap { padding: 32px 0; }
+}
