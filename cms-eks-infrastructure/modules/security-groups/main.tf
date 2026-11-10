@@ -8,7 +8,6 @@ resource "aws_security_group" "alb" {
   description = "Controls public access to the CMS Application Load Balancer"
   vpc_id      = var.vpc_id
 
-  # Public HTTP access
   ingress {
     description = "Allow HTTP traffic"
     from_port   = 80
@@ -17,7 +16,6 @@ resource "aws_security_group" "alb" {
     cidr_blocks = var.allowed_http_cidrs
   }
 
-  # Public HTTPS access
   ingress {
     description = "Allow HTTPS traffic"
     from_port   = 443
@@ -26,7 +24,6 @@ resource "aws_security_group" "alb" {
     cidr_blocks = var.allowed_https_cidrs
   }
 
-  # ALB can send traffic to the EKS frontend
   egress {
     description     = "Allow traffic to CMS frontend on EKS"
     from_port       = var.frontend_port
@@ -39,7 +36,6 @@ resource "aws_security_group" "alb" {
     Name = "${var.project_name}-${var.environment}-alb-sg"
   }
 }
-
 
 # --------------------------------------------------
 # RDS MySQL Security Group
@@ -63,6 +59,27 @@ resource "aws_security_group" "rds" {
   }
 }
 
+# --------------------------------------------------
+# CodeBuild Security Group
+# --------------------------------------------------
+
+resource "aws_security_group" "codebuild" {
+  name        = "${var.project_name}-${var.environment}-codebuild-sg"
+  description = "Allows private CodeBuild deployments to reach required services"
+  vpc_id      = var.vpc_id
+
+  egress {
+    description = "Allow HTTPS to AWS services and EKS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-codebuild-sg"
+  }
+}
 
 # --------------------------------------------------
 # Allow ALB Traffic Into EKS Frontend
@@ -79,5 +96,23 @@ resource "aws_vpc_security_group_ingress_rule" "alb_to_eks_frontend" {
 
   tags = {
     Name = "${var.project_name}-${var.environment}-alb-to-eks-frontend"
+  }
+}
+
+# --------------------------------------------------
+# Allow CodeBuild to Access Private EKS API
+# --------------------------------------------------
+
+resource "aws_vpc_security_group_ingress_rule" "codebuild_to_eks_api" {
+  security_group_id            = var.eks_cluster_security_group_id
+  referenced_security_group_id = aws_security_group.codebuild.id
+
+  description = "Allow private CodeBuild deployments to access the EKS API"
+  ip_protocol = "tcp"
+  from_port   = 443
+  to_port     = 443
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-codebuild-to-eks-api"
   }
 }

@@ -1,4 +1,3 @@
-
 # --------------------------------------------------
 # VPC
 # --------------------------------------------------
@@ -73,12 +72,14 @@ module "iam" {
   project_name = var.project_name
   environment  = var.environment
 
-  github_repository = "jamesafful25/Content_Management_System_Website"
+  # Use GitHub's immutable owner and repository identifiers.
+  github_repository = "jamesafful25@153740580/Content_Management_System_Website@1449242541"
   github_branch     = "main"
 
-  backend_ecr_repository_arn  = module.ecr.backend_repository_arn
-  frontend_ecr_repository_arn = module.ecr.frontend_repository_arn
-  eks_cluster_arn             = module.eks.cluster_arn
+  backend_ecr_repository_arn      = module.ecr.backend_repository_arn
+  frontend_ecr_repository_arn     = module.ecr.frontend_repository_arn
+  eks_cluster_arn                 = module.eks.cluster_arn
+  deployment_artifacts_bucket_arn = module.deployment_artifacts_s3.bucket_arn
 }
 
 
@@ -140,6 +141,23 @@ module "s3" {
   environment  = var.environment
 
   bucket_name = "cms-dev-uploads-448161422880"
+
+  force_destroy = false
+}
+
+
+# --------------------------------------------------
+# S3 Bucket for CI/CD Deployment Artifacts
+# --------------------------------------------------
+
+module "deployment_artifacts_s3" {
+  source = "../../modules/s3"
+
+  project_name = var.project_name
+  environment  = var.environment
+
+  bucket_name    = "cms-dev-deployment-artifacts-448161422880"
+  bucket_purpose = "deployment-artifacts"
 
   force_destroy = false
 }
@@ -288,10 +306,13 @@ data "aws_iam_policy_document" "db_admin" {
 }
 
 
+# --------------------------------------------------
+# Database Administration IAM Policy Resource
+# --------------------------------------------------
+
 resource "aws_iam_policy" "db_admin" {
   name = "${var.project_name}-${var.environment}-db-admin"
 
-  # Keep the existing description to avoid replacing the IAM policy.
   description = "Temporary permission to retrieve the RDS master secret for database administration"
 
   policy = data.aws_iam_policy_document.db_admin.json

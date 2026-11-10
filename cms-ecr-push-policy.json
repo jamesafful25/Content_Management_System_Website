@@ -1,0 +1,27 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ECRAuthentication",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "PushImagesToCMSRepositories",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:UploadLayerPart",
+        "ecr:PutImage",
+        "ecr:InitiateLayerUpload",
+        "ecr:CompleteLayerUpload",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage"
+      ],
+      "Resource": [
+        "arn:aws:ecr:us-east-1:448161422880:repository/cms-dev-frontend",
+        "arn:aws:ecr:us-east-1:448161422880:repository/cms-dev-backend"
+      ]
+    }
+  ]
+}

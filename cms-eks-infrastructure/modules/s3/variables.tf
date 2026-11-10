@@ -1,4 +1,3 @@
-
 variable "project_name" {
   description = "Name of the project"
   type        = string
@@ -10,8 +9,14 @@ variable "environment" {
 }
 
 variable "bucket_name" {
-  description = "Globally unique S3 bucket name for CMS uploads"
+  description = "Globally unique S3 bucket name"
   type        = string
+}
+
+variable "bucket_purpose" {
+  description = "Purpose used in the S3 bucket Name tag"
+  type        = string
+  default     = "uploads"
 }
 
 variable "force_destroy" {

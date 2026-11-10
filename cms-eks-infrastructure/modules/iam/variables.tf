@@ -34,3 +34,8 @@ variable "eks_cluster_arn" {
   description = "ARN of the CMS EKS cluster"
   type        = string
 }
+
+variable "deployment_artifacts_bucket_arn" {
+  description = "ARN of the S3 bucket used for deployment artifacts"
+  type        = string
+}

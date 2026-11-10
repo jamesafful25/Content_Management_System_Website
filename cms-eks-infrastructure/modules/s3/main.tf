@@ -1,6 +1,5 @@
-
 # --------------------------------------------------
-# S3 Bucket for CMS Uploads
+# S3 Bucket
 # --------------------------------------------------
 
 resource "aws_s3_bucket" "main" {
@@ -8,7 +7,7 @@ resource "aws_s3_bucket" "main" {
   force_destroy = var.force_destroy
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-uploads"
+    Name = "${var.project_name}-${var.environment}-${var.bucket_purpose}"
   }
 }
 

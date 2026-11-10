@@ -201,3 +201,17 @@ output "s3_bucket_region" {
   description = "AWS region containing the CMS uploads bucket"
   value       = module.s3.bucket_region
 }
+
+# --------------------------------------------------
+# CI/CD Deployment Artifacts Bucket Outputs
+# --------------------------------------------------
+
+output "deployment_artifacts_bucket_id" {
+  description = "S3 bucket name for CI/CD deployment artifacts"
+  value       = module.deployment_artifacts_s3.bucket_id
+}
+
+output "deployment_artifacts_bucket_arn" {
+  description = "S3 bucket ARN for CI/CD deployment artifacts"
+  value       = module.deployment_artifacts_s3.bucket_arn
+}

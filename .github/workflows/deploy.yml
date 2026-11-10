@@ -1,0 +1,161 @@
+
+name: CMS Build and Deploy to EKS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: cms-eks-deployment
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build Images and Deploy to EKS
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ------------------------------------------
+      # STEP 1: Build and push backend image
+      # ------------------------------------------
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/dockerfile
+          push: true
+          tags: |
+            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend:${{ github.sha }}
+            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend:latest
+
+      # ------------------------------------------
+      # STEP 2: Build and push frontend image
+      # ------------------------------------------
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/dockerfile
+          push: true
+          tags: |
+            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend:${{ github.sha }}
+            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend:latest
+
+      # ------------------------------------------
+      # STEP 3: Package Kubernetes deployment files
+      # ------------------------------------------
+
+      - name: Package deployment files
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p deployment-package/kubernetes
+
+          cp cms-eks-infrastructure/buildspec-deploy.yml \
+            deployment-package/
+
+          cp cms-eks-infrastructure/kubernetes/*.yaml \
+            deployment-package/kubernetes/
+
+          cd deployment-package
+
+          zip -qr ../deployment-source.zip .
+
+          cd ..
+
+          echo "Deployment package created."
+          ls -lh deployment-source.zip
+
+      # ------------------------------------------
+      # STEP 4: Upload package to S3
+      # ------------------------------------------
+
+      - name: Upload deployment package to S3
+        run: |
+          aws s3 cp deployment-source.zip \
+            s3://cms-dev-deployment-artifacts-448161422880/deployments/source.zip
+
+      # ------------------------------------------
+      # STEP 5: Start AWS CodeBuild deployment
+      # ------------------------------------------
+
+      - name: Start CodeBuild deployment
+        id: start-build
+        run: |
+          BUILD_ID=$(aws codebuild start-build \
+            --project-name cms-dev-eks-deployment \
+            --environment-variables-override \
+              name=IMAGE_TAG,value=${GITHUB_SHA},type=PLAINTEXT \
+            --query 'build.id' \
+            --output text)
+
+          if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "None" ]; then
+            echo "ERROR: Could not start CodeBuild."
+            exit 1
+          fi
+
+          echo "BUILD_ID=$BUILD_ID" >> "$GITHUB_OUTPUT"
+
+          echo "Started CodeBuild: $BUILD_ID"
+
+      # ------------------------------------------
+      # STEP 6: Wait for deployment result
+      # ------------------------------------------
+
+      - name: Wait for CodeBuild deployment
+        run: |
+          BUILD_ID="${{ steps.start-build.outputs.BUILD_ID }}"
+
+          echo "Waiting for EKS deployment..."
+
+          while true; do
+            STATUS=$(aws codebuild batch-get-builds \
+              --ids "$BUILD_ID" \
+              --query 'builds[0].buildStatus' \
+              --output text)
+
+            echo "Current deployment status: $STATUS"
+
+            case "$STATUS" in
+              SUCCEEDED)
+                echo "CMS deployment completed successfully."
+                break
+                ;;
+              FAILED|FAULT|STOPPED|TIMED_OUT)
+                echo "ERROR: CodeBuild deployment ended with status: $STATUS"
+                exit 1
+                ;;
+              IN_PROGRESS)
+                sleep 15
+                ;;
+              *)
+                echo "ERROR: Unexpected CodeBuild status: $STATUS"
+                exit 1
+                ;;
+            esac
+          done

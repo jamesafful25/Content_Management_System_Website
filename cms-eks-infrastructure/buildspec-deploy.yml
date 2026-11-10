@@ -1,0 +1,263 @@
+
+version: 0.2
+
+env:
+  variables:
+    BACKEND_IMAGE_URI: "448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend"
+    FRONTEND_IMAGE_URI: "448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend"
+    RDS_MASTER_SECRET_ARN: "arn:aws:secretsmanager:us-east-1:448161422880:secret:rds!db-003d5a76-2185-4994-af7b-3efeee8b706e-OioMAE"
+    RUNTIME_DB_SECRET_ARN: "arn:aws:secretsmanager:us-east-1:448161422880:secret:cms/dev/database/runtime-HZGIu2"
+    MIGRATION_DB_SECRET_ARN: "arn:aws:secretsmanager:us-east-1:448161422880:secret:cms/dev/database/migration-hITBTV"
+    DB_NAME: "cms_db"
+
+phases:
+  pre_build:
+    commands:
+      - |
+        set -eu
+
+        echo "Checking deployment tools..."
+        aws --version
+        kubectl version --client
+
+        if [ -z "${IMAGE_TAG:-}" ]; then
+          echo "ERROR: IMAGE_TAG was not supplied to CodeBuild."
+          exit 1
+        fi
+
+        echo "Preparing Kubernetes authentication..."
+
+        mkdir -p "$HOME/.kube"
+
+        cat > "$HOME/.kube/config" <<KUBECONFIG
+        apiVersion: v1
+        kind: Config
+        clusters:
+          - name: cms-eks
+            cluster:
+              server: ${EKS_CLUSTER_ENDPOINT}
+              certificate-authority-data: ${EKS_CLUSTER_CA}
+        contexts:
+          - name: cms-eks
+            context:
+              cluster: cms-eks
+              user: cms-codebuild
+        current-context: cms-eks
+        users:
+          - name: cms-codebuild
+            user:
+              exec:
+                apiVersion: client.authentication.k8s.io/v1beta1
+                command: aws
+                args:
+                  - eks
+                  - get-token
+                  - --cluster-name
+                  - ${EKS_CLUSTER_NAME}
+                  - --region
+                  - ${AWS_DEFAULT_REGION}
+                  - --output
+                  - json
+        KUBECONFIG
+
+        export KUBECONFIG="$HOME/.kube/config"
+
+        echo "Testing connection to EKS..."
+        kubectl get nodes
+
+  build:
+    commands:
+      - |
+        set -eu
+
+        export KUBECONFIG="$HOME/.kube/config"
+
+        BACKEND_IMAGE="${BACKEND_IMAGE_URI}:${IMAGE_TAG}"
+        FRONTEND_IMAGE="${FRONTEND_IMAGE_URI}:${IMAGE_TAG}"
+
+        echo "Deploying backend image: ${BACKEND_IMAGE}"
+        echo "Deploying frontend image: ${FRONTEND_IMAGE}"
+
+        # Apply application configuration.
+        # The cms and cms-db-admin namespaces already exist.
+        kubectl apply -f kubernetes/configmap.yaml
+        kubectl apply -f kubernetes/service-account.yaml
+
+        # --------------------------------------------------
+        # STEP 1: Create database users and store credentials
+        # --------------------------------------------------
+
+        echo "Starting database user setup..."
+
+        kubectl delete job cms-db-user-setup \
+          -n cms-db-admin --ignore-not-found=true
+
+        cat > /tmp/db-user-setup-job.yaml <<JOB
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: cms-db-user-setup
+          namespace: cms-db-admin
+        spec:
+          backoffLimit: 0
+          template:
+            spec:
+              serviceAccountName: cms-db-admin-sa
+              restartPolicy: Never
+              containers:
+                - name: database-setup
+                  image: ${BACKEND_IMAGE}
+                  imagePullPolicy: IfNotPresent
+                  command: ["node", "scripts/setup-database-users.js"]
+                  env:
+                    - name: AWS_REGION
+                      value: "${AWS_DEFAULT_REGION}"
+                    - name: RDS_MASTER_SECRET_ARN
+                      value: "${RDS_MASTER_SECRET_ARN}"
+                    - name: RUNTIME_DB_SECRET_ARN
+                      value: "${RUNTIME_DB_SECRET_ARN}"
+                    - name: MIGRATION_DB_SECRET_ARN
+                      value: "${MIGRATION_DB_SECRET_ARN}"
+                    - name: DB_NAME
+                      value: "${DB_NAME}"
+        JOB
+
+        kubectl apply -f /tmp/db-user-setup-job.yaml
+
+        if ! kubectl wait \
+          --for=condition=complete \
+          job/cms-db-user-setup \
+          -n cms-db-admin \
+          --timeout=10m; then
+
+          kubectl describe job cms-db-user-setup -n cms-db-admin
+          kubectl logs job/cms-db-user-setup -n cms-db-admin || true
+          exit 1
+        fi
+
+        kubectl logs job/cms-db-user-setup -n cms-db-admin
+        kubectl delete job cms-db-user-setup -n cms-db-admin
+
+        # --------------------------------------------------
+        # STEP 2: Synchronize application secrets
+        # --------------------------------------------------
+
+        echo "Applying AWS Secrets Manager configuration..."
+
+        kubectl apply -f kubernetes/secret-store.yaml
+        kubectl apply -f kubernetes/external-secret.yaml
+
+        echo "Waiting for application secrets..."
+
+        if ! kubectl wait \
+          --for=condition=Ready \
+          externalsecret/cms-app-secrets \
+          -n cms \
+          --timeout=5m; then
+
+          kubectl describe externalsecret cms-app-secrets -n cms
+          exit 1
+        fi
+
+        # --------------------------------------------------
+        # STEP 3: Run database migrations
+        # --------------------------------------------------
+
+        echo "Starting database migrations..."
+
+        kubectl delete job cms-db-migration \
+          -n cms --ignore-not-found=true
+
+        cat > /tmp/db-migration-job.yaml <<JOB
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: cms-db-migration
+          namespace: cms
+        spec:
+          backoffLimit: 0
+          template:
+            spec:
+              serviceAccountName: cms-backend-sa
+              restartPolicy: Never
+              containers:
+                - name: database-migration
+                  image: ${BACKEND_IMAGE}
+                  imagePullPolicy: IfNotPresent
+                  command: ["node", "migrations/migration-runner.js"]
+                  envFrom:
+                    - configMapRef:
+                        name: cms-config
+                  env:
+                    - name: DB_USER
+                      valueFrom:
+                        secretKeyRef:
+                          name: cms-app-secrets
+                          key: MIGRATION_DB_USER
+                    - name: DB_PASSWORD
+                      valueFrom:
+                        secretKeyRef:
+                          name: cms-app-secrets
+                          key: MIGRATION_DB_PASSWORD
+        JOB
+
+        kubectl apply -f /tmp/db-migration-job.yaml
+
+        if ! kubectl wait \
+          --for=condition=complete \
+          job/cms-db-migration \
+          -n cms \
+          --timeout=10m; then
+
+          kubectl describe job cms-db-migration -n cms
+          kubectl logs job/cms-db-migration -n cms || true
+          exit 1
+        fi
+
+        kubectl logs job/cms-db-migration -n cms
+        kubectl delete job cms-db-migration -n cms
+
+        # --------------------------------------------------
+        # STEP 4: Deploy application resources
+        # --------------------------------------------------
+
+        echo "Applying Kubernetes services and ingress..."
+
+        kubectl apply -f kubernetes/services.yaml
+        kubectl apply -f kubernetes/ingress.yaml
+
+        echo "Applying backend deployment with commit SHA..."
+
+        sed "s|:latest|:${IMAGE_TAG}|g" \
+          kubernetes/backend-deployment.yaml \
+          > /tmp/backend-deployment.yaml
+
+        kubectl apply -f /tmp/backend-deployment.yaml
+
+        echo "Applying frontend deployment with commit SHA..."
+
+        sed "s|:latest|:${IMAGE_TAG}|g" \
+          kubernetes/frontend-deployment.yaml \
+          > /tmp/frontend-deployment.yaml
+
+        kubectl apply -f /tmp/frontend-deployment.yaml
+
+        # --------------------------------------------------
+        # STEP 5: Verify deployment rollouts
+        # --------------------------------------------------
+
+        echo "Waiting for backend rollout..."
+
+        kubectl rollout status deployment/cms-backend \
+          -n cms --timeout=10m
+
+        echo "Waiting for frontend rollout..."
+
+        kubectl rollout status deployment/cms-frontend \
+          -n cms --timeout=10m
+
+        echo "Deployment completed successfully."
+
+        kubectl get deployments -n cms
+        kubectl get pods -n cms
+        kubectl get ingress -n cms

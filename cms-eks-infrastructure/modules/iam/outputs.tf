@@ -13,3 +13,13 @@ output "ecr_push_policy_arn" {
   description = "ARN of the CMS ECR push policy"
   value       = aws_iam_policy.ecr_push.arn
 }
+
+output "codebuild_role_name" {
+  description = "Name of the CodeBuild deployment role"
+  value       = aws_iam_role.codebuild.name
+}
+
+output "codebuild_role_arn" {
+  description = "ARN of the CodeBuild deployment role"
+  value       = aws_iam_role.codebuild.arn
+}
