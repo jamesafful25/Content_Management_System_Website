@@ -294,6 +294,7 @@ data "aws_iam_policy_document" "db_admin" {
     effect = "Allow"
 
     actions = [
+      "secretsmanager:GetSecretValue",
       "secretsmanager:PutSecretValue",
       "secretsmanager:DescribeSecret"
     ]
