@@ -48,7 +48,7 @@ jobs:
           file: ./backend/dockerfile
           push: true
           tags: |
-            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend:${{ github.sha }}
+            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-backend:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # ------------------------------------------
       # STEP 2: Build and push frontend image
@@ -61,7 +61,7 @@ jobs:
           file: ./frontend/dockerfile
           push: true
           tags: |
-            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend:${{ github.sha }}
+            448161422880.dkr.ecr.us-east-1.amazonaws.com/cms-dev-frontend:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # ------------------------------------------
       # STEP 3: Package Kubernetes deployment files
@@ -108,7 +108,7 @@ jobs:
           BUILD_ID=$(aws codebuild start-build \
             --project-name cms-dev-eks-deployment \
             --environment-variables-override \
-              name=IMAGE_TAG,value=${GITHUB_SHA},type=PLAINTEXT \
+              name=IMAGE_TAG,value=${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT},type=PLAINTEXT \
             --query 'build.id' \
             --output text)
 
